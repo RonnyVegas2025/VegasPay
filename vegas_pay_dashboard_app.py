@@ -302,14 +302,16 @@ if page == "📊 Dashboard":
     aud = pd.DataFrame()
     if not filt_cart.empty:
         aud = filt_cart.groupby("Mes", as_index=False).agg(
-            Vendas_Brutas_R$=("Valor","sum"),
-            MDR_R$=("MDR (R$)","sum"),
-            Tarifa_Ant_R$=("Tarifa_Ant","sum"),
-            Receita_Ant_Vegas=("Receita_Vegas_Ant (R$)","sum"),
-            Custo_Entrepay_MDR_R$=("Custo_Entrepay_MDR (R$)","sum"),
-            Vegas_Bruto_R$=("Vegas_Bruto (R$)","sum"),
-            Imposto_R$=("Imposto_sobre_VegasBruto (R$)","sum"),
-            MDR_Liquido_R$=("MDR Líquido Vegas (R$)","sum"),
+            **{
+                "Vendas_Brutas_R$": ("Valor","sum"),
+                "MDR_R$": ("MDR (R$)","sum"),
+                "Tarifa_Ant_R$": ("Tarifa_Ant","sum"),
+                "Receita_Ant_Vegas": ("Receita_Vegas_Ant (R$)","sum"),
+                "Custo_Entrepay_MDR_R$": ("Custo_Entrepay_MDR (R$)","sum"),
+                "Vegas_Bruto_R$": ("Vegas_Bruto (R$)","sum"),
+                "Imposto_R$": ("Imposto_sobre_VegasBruto (R$)","sum"),
+                "MDR_Liquido_R$": ("MDR Líquido Vegas (R$)","sum"),
+            }
         )
         aud["MDR_Líquido_%"] = np.where(aud["Vendas_Brutas_R$"]>0, aud["MDR_Liquido_R$"]/aud["Vendas_Brutas_R$"]*100,0)
 
