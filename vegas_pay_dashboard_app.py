@@ -153,7 +153,12 @@ if page == "📊 Dashboard":
         ["Receita bruta (MDR + nossa parte da antecipação)", "Somente MDR (R$)", "Receita após custos Entrepay"],
         index=0
     )
-    aliq_imposto = st.sidebar.number_input("Alíquota de imposto (%)", min_value=0.0, max_value=30.0, value=float(merged["Imposto"].median()*100 or 11.5), step=0.1)/100.0
+    aliq_imposto = st.sidebar.number_input(
+        "Alíquota de imposto (%)",
+        min_value=0.0, max_value=30.0,
+        value=float(merged["Imposto"].median()*100 or 11.5),
+        step=0.1
+    )/100.0
 
     if base_imposto.startswith("Receita bruta"):
         base = merged["Receita_Bruta_Vegas (R$)"]
@@ -183,7 +188,6 @@ if page == "📊 Dashboard":
                 pix.rename(columns={c: "Data Transacao"}, inplace=True)
                 break
         if "Valor" not in pix.columns:
-            # tenta achar coluna valor
             cand = [c for c in pix.columns if "valor" in c.lower()]
             if cand: pix.rename(columns={cand[0]: "Valor"}, inplace=True)
 
@@ -276,40 +280,69 @@ if page == "📊 Dashboard":
     c4.metric("MDR Líquido (R$)",  fmt_brl(filt_cart["MDR Líquido Vegas (R$)"].sum()))
     c5.metric("MDR Líquido (%)",   fmt_pct((filt_cart["MDR Líquido Vegas (R$)"].sum()/filt_cart["Valor"].sum()*100) if filt_cart["Valor"].sum()>0 else 0))
 
-    resumo_cart = filt_cart.groupby("Mes", as_index=False).agg(
-        **{
-            "Vendas Brutas (R$)": ("Valor","sum"),
-            "MDR (R$)": ("MDR (R$)","sum"),
-            "MDR Líquido Vegas (R$)": ("MDR Líquido Vegas (R$)","sum"),
-        }
+    resumo_cart = (
+        filt_cart.groupby("Mes", as_index=False)
+                 .agg({"Valor":"sum",
+                       "MDR (R$)":"sum",
+                       "MDR Líquido Vegas (R$)":"sum"})
+                 .rename(columns={"Valor":"Vendas Brutas (R$)"})
     )
-    resumo_cart["MDR Líquido (%)"] = np.where(resumo_cart["Vendas Brutas (R$)"]>0,
-                                              resumo_cart["MDR Líquido Vegas (R$)"]/resumo_cart["Vendas Brutas (R$)"]*100,0)
-    st.dataframe(resumo_cart.style.format({
-        "Vendas Brutas (R$)":fmt_brl, "MDR (R$)":fmt_brl,
-        "MDR Líquido Vegas (R$)":fmt_brl, "MDR Líquido (%)":fmt_pct
-    }), use_container_width=True)
+    resumo_cart["MDR Líquido (%)"] = np.where(
+        resumo_cart["Vendas Brutas (R$)"]>0,
+        resumo_cart["MDR Líquido Vegas (R$)"]/resumo_cart["Vendas Brutas (R$)"]*100,
+        0.0
+    )
+    st.dataframe(
+        resumo_cart.style.format({
+            "Vendas Brutas (R$)":fmt_brl,
+            "MDR (R$)":fmt_brl,
+            "MDR Líquido Vegas (R$)":fmt_brl,
+            "MDR Líquido (%)":fmt_pct
+        }),
+        use_container_width=True
+    )
 
     # Auditoria por mês (Cartões)
-    aud = filt_cart.groupby("Mes", as_index=False).agg(
-        Vendas_Brutas_R$=("Valor","sum"),
-        MDR_R$=("MDR (R$)","sum"),
-        Tarifa_Ant_R$=("Tarifa_Ant","sum"),
-        Receita_Ant_Vegas=("Receita_Vegas_Ant (R$)","sum"),
-        Receita_Bruta_Vegas_R$=("Receita_Bruta_Vegas (R$)","sum"),
-        Custo_Entrepay_MDR_R$=("Custo_Entrepay_MDR (R$)","sum"),
-        Custo_Entrepay_Ant_R$=("Custo_Entrepay_Ant (R$)","sum"),
-        Imposto_R$=("Imposto_sobre_Receita (R$)","sum"),
-        MDR_Liquido_R$=("MDR Líquido Vegas (R$)","sum"),
+    aud = (
+        filt_cart.groupby("Mes", as_index=False)
+                .agg({
+                    "Valor":"sum",
+                    "MDR (R$)":"sum",
+                    "Tarifa_Ant":"sum",
+                    "Receita_Vegas_Ant (R$)":"sum",
+                    "Receita_Bruta_Vegas (R$)":"sum",
+                    "Custo_Entrepay_MDR (R$)":"sum",
+                    "Custo_Entrepay_Ant (R$)":"sum",
+                    "Imposto_sobre_Receita (R$)":"sum",
+                    "MDR Líquido Vegas (R$)":"sum",
+                })
+                .rename(columns={
+                    "Valor":"Vendas_Brutas_R$",
+                    "MDR (R$)":"MDR_R$",
+                    "Tarifa_Ant":"Tarifa_Ant_R$",
+                    "Receita_Vegas_Ant (R$)":"Receita_Ant_Vegas",
+                    "Receita_Bruta_Vegas (R$)":"Receita_Bruta_Vegas_R$",
+                    "Custo_Entrepay_MDR (R$)":"Custo_Entrepay_MDR_R$",
+                    "Custo_Entrepay_Ant (R$)":"Custo_Entrepay_Ant_R$",
+                    "Imposto_sobre_Receita (R$)":"Imposto_R$",
+                    "MDR Líquido Vegas (R$)":"MDR_Liquido_R$",
+                })
     )
-    aud["MDR_Líquido_%"] = np.where(aud["Vendas_Brutas_R$"]>0, aud["MDR_Liquido_R$"]/aud["Vendas_Brutas_R$"]*100,0)
+    aud["MDR_Líquido_%"] = np.where(
+        aud["Vendas_Brutas_R$"]>0,
+        aud["MDR_Liquido_R$"]/aud["Vendas_Brutas_R$"]*100,
+        0.0
+    )
     with st.expander("Auditoria de Cálculo (Cartões)", expanded=False):
-        st.dataframe(aud.style.format({
-            "Vendas_Brutas_R$":fmt_brl, "MDR_R$":fmt_brl, "Tarifa_Ant_R$":fmt_brl,
-            "Receita_Ant_Vegas":fmt_brl, "Receita_Bruta_Vegas_R$":fmt_brl,
-            "Custo_Entrepay_MDR_R$":fmt_brl, "Custo_Entrepay_Ant_R$":fmt_brl,
-            "Imposto_R$":fmt_brl, "MDR_Liquido_R$":fmt_brl, "MDR_Líquido_%":fmt_pct
-        }), use_container_width=True)
+        st.dataframe(
+            aud.style.format({
+                "Vendas_Brutas_R$":fmt_brl, "MDR_R$":fmt_brl, "Tarifa_Ant_R$":fmt_brl,
+                "Receita_Ant_Vegas":fmt_brl, "Receita_Bruta_Vegas_R$":fmt_brl,
+                "Custo_Entrepay_MDR_R$":fmt_brl, "Custo_Entrepay_Ant_R$":fmt_brl,
+                "Imposto_R$":fmt_brl, "MDR_Liquido_R$":fmt_brl, "MDR_Líquido_%":fmt_pct
+            }),
+            use_container_width=True
+        )
 
     # Gráfico evolução (Cartões)
     if len(resumo_cart) > 0:
@@ -337,20 +370,30 @@ if page == "📊 Dashboard":
         p3.metric("Imposto (R$)", fmt_brl(filt_pix["Imposto (R$)"].sum()))
         p4.metric("MDR Líquido (R$)", fmt_brl(filt_pix["MDR Líquido Vegas (R$)"].sum()))
 
-        resumo_pix = filt_pix.groupby("Mes", as_index=False).agg(
-            **{
-                "Valor Bruto (R$)": ("Valor","sum"),
-                "MDR Bruto (R$)": ("Receita_Vegas (R$)","sum"),
-                "Imposto (R$)": ("Imposto (R$)","sum"),
-                "MDR Líquido (R$)": ("MDR Líquido Vegas (R$)","sum"),
-            }
+        resumo_pix = (
+            filt_pix.groupby("Mes", as_index=False)
+                    .agg({"Valor":"sum",
+                          "Receita_Vegas (R$)":"sum",
+                          "Imposto (R$)":"sum",
+                          "MDR Líquido Vegas (R$)":"sum"})
+                    .rename(columns={
+                        "Valor":"Valor Bruto (R$)",
+                        "Receita_Vegas (R$)":"MDR Bruto (R$)",
+                        "MDR Líquido Vegas (R$)":"MDR Líquido (R$)"
+                    })
         )
-        resumo_pix["MDR Líquido (%)"] = np.where(resumo_pix["Valor Bruto (R$)"]>0,
-                                                 resumo_pix["MDR Líquido (R$)"]/resumo_pix["Valor Bruto (R$)"]*100,0)
-        st.dataframe(resumo_pix.style.format({
-            "Valor Bruto (R$)":fmt_brl, "MDR Bruto (R$)":fmt_brl,
-            "Imposto (R$)":fmt_brl, "MDR Líquido (R$)":fmt_brl, "MDR Líquido (%)":fmt_pct
-        }), use_container_width=True)
+        resumo_pix["MDR Líquido (%)"] = np.where(
+            resumo_pix["Valor Bruto (R$)"]>0,
+            resumo_pix["MDR Líquido (R$)"]/resumo_pix["Valor Bruto (R$)"]*100,
+            0.0
+        )
+        st.dataframe(
+            resumo_pix.style.format({
+                "Valor Bruto (R$)":fmt_brl, "MDR Bruto (R$)":fmt_brl,
+                "Imposto (R$)":fmt_brl, "MDR Líquido (R$)":fmt_brl, "MDR Líquido (%)":fmt_pct
+            }),
+            use_container_width=True
+        )
 
         # Gráfico evolução (PIX)
         if len(resumo_pix) > 0:
@@ -359,6 +402,7 @@ if page == "📊 Dashboard":
             ).mark_line(point=True).encode(
                 x="Mes:N", y=alt.Y("Valor:Q", title="R$"),
                 color=alt.Color("Métrica:N", scale=alt.Scale(range=["#1f77b4","#2ca02c"])),
+
                 tooltip=["Mes","Métrica","Valor"]
             )
             st.altair_chart(chart_pix, use_container_width=True)
@@ -415,11 +459,14 @@ if page == "📊 Dashboard":
         if vend_sel and "Vendedor" in com.columns:
             com = com[com["Vendedor"].astype(str).isin(vend_sel)]
 
-        com["Atingimento_%"] = np.where(com["Previsao_Mensal_R$"]>0,
-                                        com["Realizado_R$"]/com["Previsao_Mensal_R$"]*100, 0.0)
+        com["Atingimento_%"] = np.where(
+            com["Previsao_Mensal_R$"]>0,
+            com["Realizado_R$"]/com["Previsao_Mensal_R$"]*100, 0.0
+        )
 
         cA,cB,cC,cD = st.columns(4)
         cA.metric("Qtd Comércios", f"{len(com):,}".replace(",","."))
+
         cB.metric("Previsão Total (R$)", fmt_brl(com["Previsao_Mensal_R$"].sum()))
         cC.metric("Realizado Total (R$)", fmt_brl(com["Realizado_R$"].sum()))
         cD.metric("Atingimento Médio (%)", fmt_pct(com["Atingimento_%"].mean() if len(com)>0 else 0))
@@ -429,9 +476,12 @@ if page == "📊 Dashboard":
         for c in ["Mes","Nome_Fantasia","CNPJ","Vendedor","MCC"]:
             if c in com.columns: cols_show.append(c)
         cols_show += ["Previsao_Mensal_R$","Realizado_R$","Atingimento_%"]
-        st.dataframe(com[cols_show].style.format({
-            "Previsao_Mensal_R$":fmt_brl, "Realizado_R$":fmt_brl, "Atingimento_%":fmt_pct
-        }), use_container_width=True)
+        st.dataframe(
+            com[cols_show].style.format({
+                "Previsao_Mensal_R$":fmt_brl, "Realizado_R$":fmt_brl, "Atingimento_%":fmt_pct
+            }),
+            use_container_width=True
+        )
 
     # =========================
     # Exportação (Excel) — resp. aos filtros
@@ -450,6 +500,9 @@ if page == "📊 Dashboard":
                 com[cols_show].to_excel(writer, sheet_name="Comercios_Novos", index=False)
             except Exception:
                 pass
-    st.download_button("Baixar Excel", data=buffer.getvalue(),
-                       file_name="vegas_pay_export.xlsx",
-                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    st.download_button(
+        "Baixar Excel",
+        data=buffer.getvalue(),
+        file_name="vegas_pay_export.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
