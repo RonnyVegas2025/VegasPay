@@ -345,19 +345,36 @@ if page == "📊 Dashboard":
         )
 
     # Gráfico evolução (Cartões)
-    if len(resumo_cart) > 0:
-        chart_cart = alt.Chart(resumo_cart).transform_fold(
-            ["Vendas Brutas (R$)", "MDR Líquido Vegas (R$)"],
-            as_=["Métrica", "Valor"]
-        ).mark_line(point=True).encode(
-            x="Mes:N",
-            y=alt.Y("Valor:Q", title="R$"),
-            color=alt.Color("Métrica:N", scale=alt.Scale(range=["#1f77b4","#2ca02c"])),
-            tooltip=["Mes","Métrica","Valor"]
+    # Gráfico evolução (Cartões)
+if len(resumo_cart) > 0:
+    # Sanitiza tipos/valores para o Altair
+    rc = resumo_cart.copy()
+    rc["Mes"] = rc["Mes"].astype(str)
+    for col in ["Vendas Brutas (R$)", "MDR Líquido Vegas (R$)"]:
+        rc[col] = pd.to_numeric(rc[col], errors="coerce").replace([np.inf, -np.inf], np.nan).fillna(0.0)
+
+    try:
+        chart_cart = (
+            alt.Chart(rc)
+            .transform_fold(
+                ["Vendas Brutas (R$)", "MDR Líquido Vegas (R$)"],
+                as_=["Métrica", "Valor"]
+            )
+            .mark_line(point=True)
+            .encode(
+                x=alt.X("Mes:N", title="Mês", sort=None),
+                y=alt.Y("Valor:Q", title="R$"),
+                color=alt.Color(
+                    "Métrica:N",
+                    scale=alt.Scale(range=["#1f77b4", "#2ca02c"])  # azul / verde
+                ),
+                tooltip=["Mes", "Métrica", alt.Tooltip("Valor:Q", title="Valor (R$)", format=".2f")]
+            )
         )
         st.altair_chart(chart_cart, use_container_width=True)
-
-    st.divider()
+    except Exception as e:
+        st.warning(f"Não consegui montar o gráfico no Altair ({e}). Mostrando fallback.")
+        st.line_chart(rc.set_index("Mes")[["Vendas Brutas (R$)", "MDR Líquido Vegas (R$)"]])
 
     # =========================
     # Seção PIX (se houver)
@@ -396,18 +413,32 @@ if page == "📊 Dashboard":
         )
 
         # Gráfico evolução (PIX)
-        if len(resumo_pix) > 0:
-            chart_pix = alt.Chart(resumo_pix).transform_fold(
-                ["Valor Bruto (R$)", "MDR Líquido (R$)"], as_=["Métrica","Valor"]
-            ).mark_line(point=True).encode(
-                x="Mes:N", y=alt.Y("Valor:Q", title="R$"),
-                color=alt.Color("Métrica:N", scale=alt.Scale(range=["#1f77b4","#2ca02c"])),
+       # Gráfico evolução (PIX)
+if len(resumo_pix) > 0:
+    rp = resumo_pix.copy()
+    rp["Mes"] = rp["Mes"].astype(str)
+    for col in ["Valor Bruto (R$)", "MDR Líquido (R$)"]:
+        rp[col] = pd.to_numeric(rp[col], errors="coerce").replace([np.inf, -np.inf], np.nan).fillna(0.0)
 
-                tooltip=["Mes","Métrica","Valor"]
+    try:
+        chart_pix = (
+            alt.Chart(rp)
+            .transform_fold(
+                ["Valor Bruto (R$)", "MDR Líquido (R$)"],
+                as_=["Métrica", "Valor"]
             )
-            st.altair_chart(chart_pix, use_container_width=True)
-
-    st.divider()
+            .mark_line(point=True)
+            .encode(
+                x=alt.X("Mes:N", title="Mês", sort=None),
+                y=alt.Y("Valor:Q", title="R$"),
+                color=alt.Color("Métrica:N", scale=alt.Scale(range=["#1f77b4", "#2ca02c"])),
+                tooltip=["Mes", "Métrica", alt.Tooltip("Valor:Q", title="Valor (R$)", format=".2f")]
+            )
+        )
+        st.altair_chart(chart_pix, use_container_width=True)
+    except Exception as e:
+        st.warning(f"Não consegui montar o gráfico no Altair ({e}). Mostrando fallback.")
+        st.line_chart(rp.set_index("Mes")[["Valor Bruto (R$)", "MDR Líquido (R$)"]])
 
     # =========================
     # Comércios Novos (se houver)
